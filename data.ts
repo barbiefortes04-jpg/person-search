@@ -1,0 +1,7 @@
+// data.ts
+import { Person } from "./types";
+
+export let persons: Person[] = [
+  { id: 1, name: "John Doe", age: 30, email: "john@example.com" },
+  { id: 2, name: "Jane Smith", age: 25, email: "jane@example.com" },
+];
