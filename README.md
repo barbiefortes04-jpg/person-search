@@ -1,19 +1,19 @@
-# 📋 Person Search - OAuth-Secured CRUD Application
+#  Person Search - OAuth-Secured CRUD Application
 
 This is a Next.js 14 application demonstrating enterprise-grade OAuth authentication with Auth.js (NextAuth v5) and Google OAuth provider, featuring protected Person CRUD operations.
 
-## 🎯 Week 5 Deliverable: OAuth-Secured Person App
+## Week 5 Deliverable: OAuth-Secured Person App
 
 This application meets all requirements for the Week 5 OAuth implementation deliverable, including:
 
-- ✅ **Auth.js (NextAuth v5)** with Google OAuth provider integration
-- ✅ **Protected routes** requiring authentication for Person CRUD operations
-- ✅ **User session management** with JWT strategy
-- ✅ **Secure logout functionality** with proper session handling
-- ✅ **OAuth-protected MCP server** access
-- ✅ **Built-in documentation pages** (`/auth-setup`, `/security`, `/github`, `/about`)
-- ✅ **Professional UI/UX** with modern dark theme
-- ✅ **Full CRUD operations** for Person entities
+-  **Auth.js (NextAuth v5)** with Google OAuth provider integration
+- **Protected routes** requiring authentication for Person CRUD operations
+- **User session management** with JWT strategy
+- **Secure logout functionality** with proper session handling
+  - **OAuth-protected MCP server** access
+-  **Built-in documentation pages** (`/auth-setup`, `/security`, `/github`, `/about`)
+-  **Professional UI/UX** with modern dark theme
+- **Full CRUD operations** for Person entities
 
 ## Environment Variables
 
