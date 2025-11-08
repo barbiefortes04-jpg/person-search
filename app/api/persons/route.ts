@@ -1,52 +1,88 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
-import { persons } from "@/data";
+import { prisma } from "@/lib/prisma";
+import { z } from "zod";
+
+const PersonSchema = z.object({
+  name: z.string().min(1, "Name is required"),
+  age: z.number().int().positive("Age must be a positive number"),
+  email: z.string().email("Invalid email format"),
+});
 
 // GET all persons
 export async function GET() {
-  const session = await getServerSession(authOptions);
-  
-  if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  try {
+    const session = await getServerSession(authOptions);
+    
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
 
-  return NextResponse.json(persons);
+    const persons = await prisma.person.findMany({
+      orderBy: { id: 'desc' }
+    });
+    
+    return NextResponse.json(persons);
+  } catch (error) {
+    console.error("Error fetching persons:", error);
+    return NextResponse.json(
+      { error: "Internal server error" }, 
+      { status: 500 }
+    );
+  }
 }
 
 // POST create new person
 export async function POST(req: Request) {
-  const session = await getServerSession(authOptions);
-  
-  if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
   try {
-    const body = await req.json();
-    const { name, age, email } = body;
+    const session = await getServerSession(authOptions);
+    
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
 
-    if (!name || !age || !email) {
+    const body = await req.json();
+    
+    // Validate input data
+    const validatedData = PersonSchema.parse({
+      name: body.name,
+      age: parseInt(body.age),
+      email: body.email,
+    });
+
+    // Check if email already exists
+    const existingPerson = await prisma.person.findUnique({
+      where: { email: validatedData.email }
+    });
+
+    if (existingPerson) {
       return NextResponse.json(
-        { error: "Missing required fields" },
-        { status: 400 }
+        { error: "Email already exists" },
+        { status: 409 }
       );
     }
 
-    const newPerson = {
-      id: persons.length > 0 ? Math.max(...persons.map(p => p.id)) + 1 : 1,
-      name,
-      age: parseInt(age),
-      email,
-    };
-
-    persons.push(newPerson);
+    const newPerson = await prisma.person.create({
+      data: validatedData,
+    });
 
     return NextResponse.json(newPerson, { status: 201 });
   } catch (error) {
+    if (error instanceof z.ZodError) {
+      return NextResponse.json(
+        { 
+          error: "Invalid data", 
+          details: error.errors.map(e => ({ field: e.path.join('.'), message: e.message }))
+        }, 
+        { status: 400 }
+      );
+    }
+    
+    console.error("Error creating person:", error);
     return NextResponse.json(
-      { error: "Invalid request body" },
-      { status: 400 }
+      { error: "Internal server error" }, 
+      { status: 500 }
     );
   }
 }
