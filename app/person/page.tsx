@@ -3,7 +3,13 @@
 import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { Person } from "@/types";
+import { Person, ApiResponse } from "@/types";
+
+interface FormData {
+  name: string;
+  age: string;
+  email: string;
+}
 
 export default function PersonPage() {
   const { data: session, status } = useSession();
@@ -12,7 +18,9 @@ export default function PersonPage() {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingPerson, setEditingPerson] = useState<Person | null>(null);
-  const [formData, setFormData] = useState({
+  const [error, setError] = useState<string>("");
+  const [submitting, setSubmitting] = useState(false);
+  const [formData, setFormData] = useState<FormData>({
     name: "",
     age: "",
     email: "",
@@ -28,13 +36,18 @@ export default function PersonPage() {
 
   const fetchPersons = async () => {
     try {
+      setError("");
       const res = await fetch("/api/persons");
+      const data = await res.json();
+      
       if (res.ok) {
-        const data = await res.json();
         setPersons(data);
+      } else {
+        setError(data.error || "Failed to fetch persons");
       }
     } catch (error) {
       console.error("Error fetching persons:", error);
+      setError("Network error occurred");
     } finally {
       setLoading(false);
     }
@@ -42,35 +55,56 @@ export default function PersonPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSubmitting(true);
+    setError("");
 
     try {
-      if (editingPerson) {
-        // Update existing person
-        const res = await fetch(`/api/persons/${editingPerson.id}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(formData),
-        });
+      const payload = {
+        name: formData.name.trim(),
+        age: parseInt(formData.age),
+        email: formData.email.trim(),
+      };
 
-        if (res.ok) {
-          await fetchPersons();
-          resetForm();
-        }
+      // Validate on client side
+      if (!payload.name || !payload.age || !payload.email) {
+        setError("All fields are required");
+        return;
+      }
+
+      if (payload.age <= 0) {
+        setError("Age must be a positive number");
+        return;
+      }
+
+      const url = editingPerson 
+        ? `/api/persons/${editingPerson.id}`
+        : "/api/persons";
+      
+      const method = editingPerson ? "PUT" : "POST";
+
+      const res = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        await fetchPersons();
+        resetForm();
       } else {
-        // Create new person
-        const res = await fetch("/api/persons", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(formData),
-        });
-
-        if (res.ok) {
-          await fetchPersons();
-          resetForm();
+        setError(data.error || "Failed to save person");
+        if (data.details) {
+          const fieldErrors = data.details.map((d: any) => `${d.field}: ${d.message}`).join(", ");
+          setError(`${data.error}: ${fieldErrors}`);
         }
       }
     } catch (error) {
       console.error("Error saving person:", error);
+      setError("Network error occurred");
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -82,21 +116,28 @@ export default function PersonPage() {
       email: person.email,
     });
     setShowForm(true);
+    setError("");
   };
 
   const handleDelete = async (id: number) => {
     if (!confirm("Are you sure you want to delete this person?")) return;
 
     try {
+      setError("");
       const res = await fetch(`/api/persons/${id}`, {
         method: "DELETE",
       });
 
+      const data = await res.json();
+
       if (res.ok) {
         await fetchPersons();
+      } else {
+        setError(data.error || "Failed to delete person");
       }
     } catch (error) {
       console.error("Error deleting person:", error);
+      setError("Network error occurred");
     }
   };
 
@@ -104,12 +145,15 @@ export default function PersonPage() {
     setFormData({ name: "", age: "", email: "" });
     setEditingPerson(null);
     setShowForm(false);
+    setError("");
   };
 
   if (status === "loading" || loading) {
     return (
       <main className="main-content">
-        <p>Loading...</p>
+        <div className="loading-container">
+          <p>Loading...</p>
+        </div>
       </main>
     );
   }
@@ -132,10 +176,18 @@ export default function PersonPage() {
         <button
           onClick={() => setShowForm(!showForm)}
           className="btn-primary"
+          disabled={submitting}
         >
           {showForm ? "Cancel" : "Add New Person"}
         </button>
       </div>
+
+      {error && (
+        <div className="error-message">
+          <p>{error}</p>
+          <button onClick={() => setError("")} className="btn-close">×</button>
+        </div>
+      )}
 
       {showForm && (
         <div className="card">
@@ -144,7 +196,7 @@ export default function PersonPage() {
           </h2>
           <form onSubmit={handleSubmit}>
             <div className="form-group">
-              <label className="form-label">Name</label>
+              <label className="form-label">Name *</label>
               <input
                 type="text"
                 className="form-input"
@@ -153,10 +205,12 @@ export default function PersonPage() {
                   setFormData({ ...formData, name: e.target.value })
                 }
                 required
+                disabled={submitting}
+                placeholder="Enter full name"
               />
             </div>
             <div className="form-group">
-              <label className="form-label">Age</label>
+              <label className="form-label">Age *</label>
               <input
                 type="number"
                 className="form-input"
@@ -165,10 +219,14 @@ export default function PersonPage() {
                   setFormData({ ...formData, age: e.target.value })
                 }
                 required
+                min="1"
+                max="120"
+                disabled={submitting}
+                placeholder="Enter age"
               />
             </div>
             <div className="form-group">
-              <label className="form-label">Email</label>
+              <label className="form-label">Email *</label>
               <input
                 type="email"
                 className="form-input"
@@ -177,16 +235,26 @@ export default function PersonPage() {
                   setFormData({ ...formData, email: e.target.value })
                 }
                 required
+                disabled={submitting}
+                placeholder="Enter email address"
               />
             </div>
             <div style={{ display: "flex", gap: "1rem" }}>
-              <button type="submit" className="btn-primary">
-                {editingPerson ? "Update" : "Create"}
+              <button 
+                type="submit" 
+                className="btn-primary"
+                disabled={submitting}
+              >
+                {submitting 
+                  ? (editingPerson ? "Updating..." : "Creating...") 
+                  : (editingPerson ? "Update" : "Create")
+                }
               </button>
               <button
                 type="button"
                 onClick={resetForm}
                 className="btn-secondary"
+                disabled={submitting}
               >
                 Cancel
               </button>
@@ -205,12 +273,14 @@ export default function PersonPage() {
               <button
                 onClick={() => handleEdit(person)}
                 className="btn-edit"
+                disabled={submitting}
               >
                 Edit
               </button>
               <button
                 onClick={() => handleDelete(person.id)}
                 className="btn-delete"
+                disabled={submitting}
               >
                 Delete
               </button>
@@ -219,7 +289,7 @@ export default function PersonPage() {
         ))}
       </div>
 
-      {persons.length === 0 && !loading && (
+      {persons.length === 0 && !loading && !error && (
         <div className="card">
           <p className="card-content">
             No persons found. Click "Add New Person" to create one.
