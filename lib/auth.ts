@@ -1,7 +1,7 @@
 // lib/auth.ts
-import { NextAuthOptions, Session } from "next-auth";
+import { NextAuthOptions } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
-import { JWT } from "next-auth/jwt";
+
 export const authOptions: NextAuthOptions = {
   providers: [
     GoogleProvider({
@@ -13,11 +13,22 @@ export const authOptions: NextAuthOptions = {
   session: {
     strategy: "jwt",
   },
+  pages: {
+    signIn: "/auth/signin",
+    error: "/auth/error",
+  },
   callbacks: {
-    async session({ session, token }: { session: Session; token: JWT }) {
-      // attach user id/email if needed
-      session.user = session.user ?? { name: token.name, email: token.email };
+    async session({ session, token }) {
+      if (session.user) {
+        session.user.id = token.sub!;
+      }
       return session;
+    },
+    async jwt({ token, user }) {
+      if (user) {
+        token.id = user.id;
+      }
+      return token;
     },
   },
 };
