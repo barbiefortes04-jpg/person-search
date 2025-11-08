@@ -67,6 +67,12 @@ export default function Navigation() {
           >
             GitHub
           </Link>
+          <Link 
+            href="/debug" 
+            className={`nav-link ${isActive("/debug") ? "active" : ""}`}
+          >
+            Debug
+          </Link>
           
           {session && (
             <Link 
